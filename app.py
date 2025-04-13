@@ -2,15 +2,15 @@ import streamlit as st
 import pandas as pd
 import io
 from datetime import datetime
+import pytz
 
-# 🔧 Cambiar título de pestaña
+# 🔧 Configuración de la pestaña
 st.set_page_config(
     page_title="Mosare App",
     page_icon="🩺",
 )
 
 st.title("🎯 Filtro de pacientes Mosare")
-
 
 # Subida de archivos
 aten_file = st.file_uploader("📄 Sube el archivo AtenMedxServ", type=["txt"])
@@ -104,8 +104,9 @@ if aten_file and resul_file and cartera_file:
         st.success(f"✅ Se encontraron {len(df_resultado)} registros válidos.")
         st.dataframe(df_resultado)
 
-        # Obtener fecha y hora actual
-        ahora = datetime.now().strftime("%Y%m%d_%H%M")
+        # Obtener hora local de Perú
+        zona_peru = pytz.timezone("America/Lima")
+        ahora = datetime.now(zona_peru).strftime("%Y%m%d_%H%M")
 
         # Funciones de exportación
         def to_txt(df):
