@@ -37,12 +37,40 @@ ipres_dict = {
     "029": "POSTA MEDICA CONSTRUCCION CIVIL"
 }
 
+# Constantes para el parsing
+TOTAL_COLS = 63          # número total de columnas en el archivo
+I_FIJO = 42              # índice 0-based de TELEF_FIJO
+I_HORA = 48              # índice 0-based de HORA_REGISTRO
+
+def fix_line_intelligent(line: str) -> list:
+    """Corrige líneas con pipes extra eliminando campos vacíos entre TELEF_MOVIL y HORA_REGISTRO."""
+    parts = line.rstrip("\n").split("|")
+    extra = len(parts) - TOTAL_COLS
+    if extra > 0:
+        start, end = I_FIJO + 1, I_HORA
+        empty_idxs = [i for i in range(start, end) if parts[i] == ""]
+        for idx in empty_idxs[:extra]:
+            parts.pop(idx)
+            empty_idxs = [j-1 if j > idx else j for j in empty_idxs]
+    if len(parts) < TOTAL_COLS:
+        parts += [""] * (TOTAL_COLS - len(parts))
+    if len(parts) > TOTAL_COLS:
+        parts = parts[:TOTAL_COLS]
+    return parts
+
+def read_pipe_file(uploaded_file) -> pd.DataFrame:
+    """Lee un archivo de texto con separador '|' aplicando fix_line_intelligent a cada línea."""
+    raw = uploaded_file.read().decode("utf-8").splitlines()
+    rows = [fix_line_intelligent(l) for l in raw]
+    header, *data = rows
+    return pd.DataFrame(data, columns=header)
+
 if aten_file and resul_file and cartera_file:
     if st.button("🔍 Realizar búsqueda"):
-        # Leer archivos
-        df_aten = pd.read_csv(aten_file, sep="|", dtype=str)
-        df_exam = pd.read_csv(resul_file, sep="|", dtype=str)
-        df_cartera = pd.read_csv(cartera_file, sep="|", dtype=str)
+        # Leer archivos con parsing inteligente
+        df_aten = read_pipe_file(aten_file)
+        df_exam = read_pipe_file(resul_file)
+        df_cartera = read_pipe_file(cartera_file)
 
         # Eliminar duplicados por DOC_PACIENTE
         df_aten_unique = df_aten.drop_duplicates(subset="DOC_PACIENTE", keep="first")
@@ -65,7 +93,12 @@ if aten_file and resul_file and cartera_file:
         df_filtrado = df_filtrado[~dni_formateado.isin(df_cartera["NUM-DOCMTO"])]
 
         # Merge con datos del paciente
-        df_merge = df_filtrado.merge(df_aten_unique, left_on="DNI", right_on="DOC_PACIENTE", how="left")
+        df_merge = df_filtrado.merge(
+            df_aten_unique,
+            left_on="DNI",
+            right_on="DOC_PACIENTE",
+            how="left"
+        )
 
         # Eliminar si la edad (ANNOS_y) está vacía
         df_merge = df_merge[df_merge["ANNOS_y"].notna()]
@@ -124,8 +157,23 @@ if aten_file and resul_file and cartera_file:
         # Botones de descarga con timestamp
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.download_button("⬇️ Descargar TXT", to_txt(df_resultado), file_name=f"resultado_{ahora}.txt", mime="text/plain")
+            st.download_button(
+                "⬇️ Descargar TXT",
+                to_txt(df_resultado),
+                file_name=f"resultado_{ahora}.txt",
+                mime="text/plain"
+            )
         with col2:
-            st.download_button("⬇️ Descargar CSV", to_csv(df_resultado), file_name=f"resultado_{ahora}.csv", mime="text/csv")
+            st.download_button(
+                "⬇️ Descargar CSV",
+                to_csv(df_resultado),
+                file_name=f"resultado_{ahora}.csv",
+                mime="text/csv"
+            )
         with col3:
-            st.download_button("⬇️ Descargar Excel", to_excel(df_resultado), file_name=f"resultado_{ahora}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button(
+                "⬇️ Descargar Excel",
+                to_excel(df_resultado),
+                file_name=f"resultado_{ahora}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
