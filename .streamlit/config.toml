@@ -1,0 +1,2 @@
+[server]
+maxUploadSize = 300  # límite en MB
